@@ -9,10 +9,10 @@ import java.io.InputStream
 private val ns: String? = null
 
 class IssNdlXmlParser {
-    data class Entry(val title: String?, val creator : String?, val description: String?, val publisher: String?, val language: String?)
+    data class IssNdlBookInfo(val title: String?, val creator : String?, val description: String?, val publisher: String?, val language: String?)
 
     @Throws(XmlPullParserException::class, IOException::class)
-    fun parse(inputStream: InputStream): List<Entry> {
+    fun parse(inputStream: InputStream): List<IssNdlBookInfo> {
         inputStream.use { inputStream ->
             val parser: XmlPullParser = Xml.newPullParser()
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -22,7 +22,7 @@ class IssNdlXmlParser {
         }
     }
     @Throws(XmlPullParserException::class, IOException::class)
-    private fun readFeed(parser: XmlPullParser): List<Entry> {
+    private fun readFeed(parser: XmlPullParser): List<IssNdlBookInfo> {
 
         parser.require(XmlPullParser.START_TAG, ns, "searchRetrieveResponse")
         while (parser.next() != XmlPullParser.END_TAG) {
@@ -37,11 +37,11 @@ class IssNdlXmlParser {
                 skip(parser)
             }
         }
-        return mutableListOf<Entry>()
+        return mutableListOf<IssNdlBookInfo>()
     }
     @Throws(XmlPullParserException::class, IOException::class)
-    private fun readRecords(parser: XmlPullParser): List<Entry> {
-        val entries = mutableListOf<Entry>()
+    private fun readRecords(parser: XmlPullParser): List<IssNdlBookInfo> {
+        val entries = mutableListOf<IssNdlBookInfo>()
 
         parser.require(XmlPullParser.START_TAG, ns, "records")
 
@@ -59,7 +59,7 @@ class IssNdlXmlParser {
         return entries
     }
     @Throws(XmlPullParserException::class, IOException::class)
-    private fun readRecord(parser: XmlPullParser): Entry {
+    private fun readRecord(parser: XmlPullParser): IssNdlBookInfo {
         parser.require(XmlPullParser.START_TAG, ns, "record")
 
         while (parser.next() != XmlPullParser.END_TAG) {
@@ -73,10 +73,10 @@ class IssNdlXmlParser {
                 skip(parser)
             }
         }
-        return Entry("", "", "", "", "")
+        return IssNdlBookInfo("", "", "", "", "")
     }
     @Throws(XmlPullParserException::class, IOException::class)
-    private fun readRecordData(parser: XmlPullParser): Entry {
+    private fun readRecordData(parser: XmlPullParser): IssNdlBookInfo {
         parser.require(XmlPullParser.START_TAG, ns, "recordData")
 
         while (parser.next() != XmlPullParser.END_TAG) {
@@ -90,12 +90,12 @@ class IssNdlXmlParser {
                 skip(parser)
             }
         }
-        return Entry("", "", "", "", "")
+        return IssNdlBookInfo("", "", "", "", "")
     }
     // Parses the contents of an entry. If it encounters a title, summary, or link tag, hands them off
     // to their respective "read" methods for processing. Otherwise, skips the tag.
     @Throws(XmlPullParserException::class, IOException::class)
-    private fun readEntry(parser: XmlPullParser): Entry {
+    private fun readEntry(parser: XmlPullParser): IssNdlBookInfo {
         parser.require(XmlPullParser.START_TAG, ns, "srw_dc:dc")
         var title: String? = null
         var creator: String? = null
@@ -117,7 +117,7 @@ class IssNdlXmlParser {
                 else -> skip(parser)
             }
         }
-        return Entry(title, creator, description, publisher, language)
+        return IssNdlBookInfo(title, creator, description, publisher, language)
     }
     // Processes tags in the feed.
     @Throws(IOException::class, XmlPullParserException::class)

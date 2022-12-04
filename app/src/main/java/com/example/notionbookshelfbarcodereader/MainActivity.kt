@@ -1,18 +1,17 @@
 package com.example.notionbookshelfbarcodereader
+import android.content.DialogInterface
 import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.notionbookshelfbarcodereader.databinding.ActivityMainBinding
 import com.google.mlkit.vision.barcode.common.Barcode
 import okhttp3.ResponseBody
-import org.xmlpull.v1.XmlPullParserException
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.Retrofit
-import java.io.IOException
-import java.io.InputStream
 
 
 class MainActivity : AppCompatActivity() {
@@ -86,28 +85,55 @@ class MainActivity : AppCompatActivity() {
         return get.execute()
     }
     private fun parseXml(response: Response<ResponseBody>) {
-//        try {
-            val responseBody: ResponseBody? = response?.body()
-            val entries: List<IssNdlXmlParser.Entry>? = responseBody?.byteStream()?.use { stream ->
-                println("stream: $stream")
-                IssNdlXmlParser().parse(stream)
-            }
-//            val entries: List<IssNdlXmlParser.Entry> = is{ stream ->
-//                // Instantiate the parser
-//                StackOverflowXmlParser().parse(stream)
-//            } ?: emptyList()
-            println("entries")
-            entries?.forEach{ entry ->
-                println(entry)
-                if (entry.title != "") {
+        val responseBody: ResponseBody? = response?.body()
+        val issNdlBookInfoList: List<IssNdlXmlParser.IssNdlBookInfo>? = responseBody?.byteStream()?.use { stream ->
+            println("stream: $stream")
+            IssNdlXmlParser().parse(stream)
+        }
+        println("entries")
+        createConfirmDialog(issNdlBookInfoList?.firstOrNull()?.title ?: "")
+//            val numOfBookInfoProperties
+//            val cityWithMaxDegrees = issNdlBookInfoList.maxByOrNull { it. }
+            // filterしたかった
+//            val filteredIssNdlBookInfoList = issNdlBookInfoList?.filter{ entry ->
+//                return@filter (entry?.title != null && entry?.title != "")
+//            }
+//            val entity = filteredIssNdlBookInfoList?.get(0)
+//            createConfirmDialog(entity.toString())
 
-                }
-            }
 //        } catch (e: XmlPullParserException) {
             // TODO: add error handling
 //            println("error in xml parser")
 //        }
     }
 
-    private fun postNotion
+    private fun postNotion(bookinfo: String) {
+
+    }
+
+    private fun createConfirmDialog(message: String) {
+        val alertDialog: AlertDialog? = this@MainActivity.let {
+            val builder = AlertDialog.Builder(it)
+            builder.setTitle("notionにこの本の情報を登録しますか？${message}")
+            builder.apply {
+                setPositiveButton(android.R.string.ok,
+                    DialogInterface.OnClickListener { dialog, id ->
+                        // User clicked OK button
+                        println("click ok button, message: $message")
+                    })
+                setNegativeButton(android.R.string.cancel,
+                    DialogInterface.OnClickListener { dialog, id ->
+                        // User cancelled the dialog
+                        println("click cancel button")
+                        dialog.cancel()
+                    })
+            }
+            // Set other dialog properties
+
+
+            // Create the AlertDialog
+            builder.create()
+        }
+        alertDialog?.show()
+    }
 }
