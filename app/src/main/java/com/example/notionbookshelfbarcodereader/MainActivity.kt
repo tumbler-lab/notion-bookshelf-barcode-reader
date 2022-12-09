@@ -4,6 +4,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy
+import android.util.Log
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
+import android.widget.TextView.OnEditorActionListener
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.notionbookshelfbarcodereader.databinding.ActivityMainBinding
@@ -20,18 +24,25 @@ class MainActivity : AppCompatActivity() {
     private val launcher = registerForActivityResult(
         CameraPermission.RequestContract(), ::onPermissionResult
     )
-    private val retrofit = Retrofit.Builder().apply {
+    private val issNdlRetrofit = Retrofit.Builder().apply {
         baseUrl("https://iss.ndl.go.jp/")
     }.build()
-    private val service = retrofit.create(IssNdlService::class.java) // NOTE: javaのクラス情報を渡す必要があるため
+//    private val notionRetrofit = Retrofit.Builder().apply {
+//        baseUrl("https://api.notion.com/v1/")
+//    }.build()
+    private val issNdlService = issNdlRetrofit.create(IssNdlService::class.java) // NOTE: javaのクラス情報を渡す必要があるため
+//    private val notionAPIService = notionRetrofit.create(NotionAPIService::class.java) // NOTE: javaのクラス情報を渡す必要があるため
     private var isOpenDialog = false // dialogが開いているかのフラグ
+    private var secretToken = ""
+    private var databaseId = ""
+    private val TAG = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         if (Build.VERSION.SDK_INT > 9) {
-            // これがないと通信できなさそう？
+            // NOTE: これがないと通信できなさそう？
             // https://stackoverflow.com/questions/25093546/android-os-networkonmainthreadexception-at-android-os-strictmodeandroidblockgua
             val policy = ThreadPolicy.Builder().permitAll().build()
             StrictMode.setThreadPolicy(policy)
@@ -43,6 +54,30 @@ class MainActivity : AppCompatActivity() {
         } else {
             launcher.launch(Unit)
         }
+        // edit text setting
+        val editTextSecretToken = findViewById<EditText>(R.id.editTextSecretToken)
+        val editTextDatabaseId = findViewById<EditText>(R.id.editTextDatabaseId)
+
+        editTextSecretToken.setOnEditorActionListener(OnEditorActionListener { v, actionId, _ ->
+            when(actionId) {
+                EditorInfo.IME_ACTION_DONE -> {
+                    secretToken = v.text.toString()
+
+                    true
+                }
+                else -> false
+            }
+        })
+        editTextDatabaseId.setOnEditorActionListener(OnEditorActionListener { v, actionId, _ ->
+            when(actionId) {
+                EditorInfo.IME_ACTION_DONE -> {
+                    databaseId = v.text.toString()
+
+                    true
+                }
+                else -> false
+            }
+        })
     }
 
     private fun onPermissionResult(granted: Boolean) {
@@ -62,9 +97,9 @@ class MainActivity : AppCompatActivity() {
         for (code in codes) {
             println("raw value ${code.rawValue}")
             if (isIsbn(code.rawValue as String)) {
-                val responseBody = fetchBookInfo(code.rawValue as String)?.body()
+                val responseBody = fetchBookInfo(code.rawValue as String).body()
                 parseXml(responseBody)
-                // parse xmlしたらcodesをリセットしたい
+                // NOTE: parse xmlしたらcodesをリセットしたい->もうなってる？
                 break
             }
         }
@@ -73,20 +108,15 @@ class MainActivity : AppCompatActivity() {
         if (code.length != 13) return false
         return  code.substring(0, 3) == "978"
     }
-    private fun fetchBookInfoFromIsbn(isbn: String): Call<ResponseBody> {
-        val query = """
-            isbn="$isbn"
-        """.trimIndent()
-        return service.fetchBookInfo("searchRetrieve", query, "xml")
+    private fun fetchBookInfoFromIsbn(query: String): Call<ResponseBody> {
+        return issNdlService.fetchBookInfo("searchRetrieve", query, "xml")
     }
 
     private fun fetchBookInfo(isbn: String): Response<ResponseBody> {
-        val get = fetchBookInfoFromIsbn(isbn)
-        //        println(responseBody.body())
-        // xml表示
-//        responseBody.body()?.let {
-//            println(it.string())
-//        }
+        val query = """
+            isbn="$isbn"
+        """.trimIndent()
+        val get = fetchBookInfoFromIsbn(query)
 
         return get.execute()
     }
@@ -97,46 +127,48 @@ class MainActivity : AppCompatActivity() {
         }
         println("entries")
         if (issNdlBookInfoList?.firstOrNull()?.title != null) {
-            createConfirmDialog(issNdlBookInfoList?.firstOrNull())
+            createConfirmDialog(issNdlBookInfoList.firstOrNull())
         }
-//            val numOfBookInfoProperties
-//            val cityWithMaxDegrees = issNdlBookInfoList.maxByOrNull { it. }
-            // filterしたかった
-//            val filteredIssNdlBookInfoList = issNdlBookInfoList?.filter{ entry ->
-//                return@filter (entry?.title != null && entry?.title != "")
-//            }
-//            val entity = filteredIssNdlBookInfoList?.get(0)
-//            createConfirmDialog(entity.toString())
-
-//        } catch (e: XmlPullParserException) {
-            // TODO: add error handling
-//            println("error in xml parser")
-//        }
+        // TODO: add error handling
     }
 
-    private fun postNotion(bookinfo: String) {
+//    private fun postCreatePages(requestBody: RequestBody): Call<ResponseBody> {
+//        return notionAPIService.createPages(
+//            "",
+//            "",
+//            "",
+//            "",
+//            requestBody,
+//        )
+//    }
 
-    }
+//    private fun postCreatePagesFromBookInfo(bookInfo: IssNdlXmlParser.IssNdlBookInfo?): Response<ResponseBody> {
+//        val requestBody: RequestBody
+//        val get = postCreatePages(requestBody)
+//
+//        return get.execute()
+//    }
 
     private fun createConfirmDialog(bookInfo: IssNdlXmlParser.IssNdlBookInfo?) {
         isOpenDialog = true
-        val alertDialog: AlertDialog? = this@MainActivity.let {
+        val alertDialog: AlertDialog = this@MainActivity.let {
             val title = bookInfo?.title
             val builder = AlertDialog.Builder(it)
             builder.setTitle("notionにこの本の情報を登録しますか？${title}")
             builder.apply {
                 setPositiveButton(android.R.string.ok,
-                    DialogInterface.OnClickListener { dialog, id ->
+                    DialogInterface.OnClickListener { dialog, _ ->
                         // User clicked OK button
-                        println("click ok button, message: $title")
+                        Log.d(TAG, "click ok button, book title: $title")
+                        Log.d(TAG, "secret is $secretToken, database id is $databaseId")
                         dialog.dismiss()
                         // NOTE: dialogを閉じるのでscan再開
                         isOpenDialog = false
                     })
                 setNegativeButton(android.R.string.cancel,
-                    DialogInterface.OnClickListener { dialog, id ->
+                    DialogInterface.OnClickListener { dialog, _ ->
                         // User cancelled the dialog
-                        println("click cancel button")
+                        Log.d(TAG, "click cancel button, book title: $title")
                         dialog.cancel()
                         // NOTE: dialogを閉じるのでscan再開
                         isOpenDialog = false
@@ -148,6 +180,6 @@ class MainActivity : AppCompatActivity() {
             // Create the AlertDialog
             builder.create()
         }
-        alertDialog?.show()
+        alertDialog.show()
     }
 }
