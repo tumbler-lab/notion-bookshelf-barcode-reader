@@ -9,7 +9,7 @@ import java.io.InputStream
 private val ns: String? = null
 
 class IssNdlXmlParser {
-    data class IssNdlBookInfo(val title: String?, val creator : String?, val description: String?, val publisher: String?, val language: String?)
+    data class IssNdlBookInfo(val title: String?, val subject: String?, val creator : String?, val description: String?, val publisher: String?, val language: String?)
 
     @Throws(XmlPullParserException::class, IOException::class)
     fun parse(inputStream: InputStream): List<IssNdlBookInfo> {
@@ -73,7 +73,7 @@ class IssNdlXmlParser {
                 skip(parser)
             }
         }
-        return IssNdlBookInfo("", "", "", "", "")
+        return IssNdlBookInfo(null, null, null, null, null, null)
     }
     @Throws(XmlPullParserException::class, IOException::class)
     private fun readRecordData(parser: XmlPullParser): IssNdlBookInfo {
@@ -90,7 +90,7 @@ class IssNdlXmlParser {
                 skip(parser)
             }
         }
-        return IssNdlBookInfo("", "", "", "", "")
+        return IssNdlBookInfo(null, null, null, null, null, null)
     }
     // Parses the contents of an entry. If it encounters a title, summary, or link tag, hands them off
     // to their respective "read" methods for processing. Otherwise, skips the tag.
@@ -98,6 +98,7 @@ class IssNdlXmlParser {
     private fun readEntry(parser: XmlPullParser): IssNdlBookInfo {
         parser.require(XmlPullParser.START_TAG, ns, "srw_dc:dc")
         var title: String? = null
+        var subject: String? = null
         var creator: String? = null
         var description: String? = null
         var publisher: String? = null
@@ -110,6 +111,7 @@ class IssNdlXmlParser {
             println("readEntry: parser.name: ${parser.name}")
             when (parser.name) {
                 "dc:title" -> title = readTag(parser)
+                "dc:subject" -> subject = readTag(parser)
                 "dc:creator" -> creator = readTag(parser)
                 "dc:description" -> description = readTag(parser)
                 "dc:publisher" -> publisher = readTag(parser)
@@ -117,7 +119,7 @@ class IssNdlXmlParser {
                 else -> skip(parser)
             }
         }
-        return IssNdlBookInfo(title, creator, description, publisher, language)
+        return IssNdlBookInfo(title, subject, creator, description, publisher, language)
     }
     // Processes tags in the feed.
     @Throws(IOException::class, XmlPullParserException::class)

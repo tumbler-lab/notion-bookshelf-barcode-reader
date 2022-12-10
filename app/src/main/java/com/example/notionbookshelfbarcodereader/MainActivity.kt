@@ -8,14 +8,19 @@ import android.util.Log
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView.OnEditorActionListener
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.example.notionbookshelfbarcodereader.databinding.ActivityMainBinding
 import com.google.mlkit.vision.barcode.common.Barcode
+import okhttp3.Request
 import okhttp3.ResponseBody
+import okio.Buffer
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
 
 
 class MainActivity : AppCompatActivity() {
@@ -27,11 +32,13 @@ class MainActivity : AppCompatActivity() {
     private val issNdlRetrofit = Retrofit.Builder().apply {
         baseUrl("https://iss.ndl.go.jp/")
     }.build()
-//    private val notionRetrofit = Retrofit.Builder().apply {
-//        baseUrl("https://api.notion.com/v1/")
-//    }.build()
+    private val notionRetrofit = Retrofit.Builder()
+        .addConverterFactory(GsonConverterFactory.create())
+        .apply {
+        baseUrl("https://api.notion.com/v1/")
+    }.build()
     private val issNdlService = issNdlRetrofit.create(IssNdlService::class.java) // NOTE: javaのクラス情報を渡す必要があるため
-//    private val notionAPIService = notionRetrofit.create(NotionAPIService::class.java) // NOTE: javaのクラス情報を渡す必要があるため
+    private val notionAPIService = notionRetrofit.create(NotionAPIService::class.java) // NOTE: javaのクラス情報を渡す必要があるため
     private var isOpenDialog = false // dialogが開いているかのフラグ
     private var secretToken = ""
     private var databaseId = ""
@@ -59,10 +66,11 @@ class MainActivity : AppCompatActivity() {
         val editTextDatabaseId = findViewById<EditText>(R.id.editTextDatabaseId)
 
         editTextSecretToken.setOnEditorActionListener(OnEditorActionListener { v, actionId, _ ->
+            secretToken = v.text.toString()
             when(actionId) {
                 EditorInfo.IME_ACTION_DONE -> {
                     secretToken = v.text.toString()
-
+                    Toast.makeText(this, "secret token is $secretToken", Toast.LENGTH_SHORT).show()
                     true
                 }
                 else -> false
@@ -132,22 +140,38 @@ class MainActivity : AppCompatActivity() {
         // TODO: add error handling
     }
 
-//    private fun postCreatePages(requestBody: RequestBody): Call<ResponseBody> {
-//        return notionAPIService.createPages(
-//            "",
-//            "",
-//            "",
-//            "",
-//            requestBody,
-//        )
-//    }
+    private fun postCreatePages(requestBody: CreatePagesRequestBody): Call<ResponseBody> {
+        val authorization = "Bearer $secretToken"
+        // authorizationが間違っているもしくはrequestBodyが間違っている時にエラーを返す．
+        return notionAPIService.createPages(
+            authorization,
+            requestBody,
+        )
+    }
 
-//    private fun postCreatePagesFromBookInfo(bookInfo: IssNdlXmlParser.IssNdlBookInfo?): Response<ResponseBody> {
-//        val requestBody: RequestBody
-//        val get = postCreatePages(requestBody)
-//
-//        return get.execute()
-//    }
+    private fun postCreatePagesFromBookInfo(bookInfo: IssNdlXmlParser.IssNdlBookInfo?): Response<ResponseBody> {
+        val requestBody = CreatePagesRequestBody(
+            bookInfo?.title ?: "不明なタイトル",
+            bookInfo?.subject ?: "不明なジャンル",
+            bookInfo?.creator ?: "不明な著者",
+            bookInfo?.publisher ?: "不明な出版社",
+            databaseId
+        )
+        val get = postCreatePages(requestBody)
+
+        return get.execute()
+    }
+
+    private fun bodyToString(request: Request): String? {
+        return try {
+            val copy: Request = request.newBuilder().build()
+            val buffer = Buffer()
+            copy.body()?.writeTo(buffer)
+            buffer.readUtf8()
+        } catch (e: IOException) {
+            "did not work"
+        }
+    }
 
     private fun createConfirmDialog(bookInfo: IssNdlXmlParser.IssNdlBookInfo?) {
         isOpenDialog = true
@@ -162,6 +186,18 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "click ok button, book title: $title")
                         Log.d(TAG, "secret is $secretToken, database id is $databaseId")
                         dialog.dismiss()
+                        val res = postCreatePagesFromBookInfo(bookInfo)
+                        Log.d(TAG, res.body().toString())
+                        Log.d(TAG, "request url, ${res.raw().request().url()}")
+                        Log.d(TAG, "request body: ${bodyToString(res.raw().request())}")
+                        Log.d(TAG, "request headers: ${res.raw().request().headers()}")
+                        Log.d(TAG, "status code: ${res?.code()}, headers: ${res?.headers()}");
+                        Log.d(TAG, "res body: ${res.body()?.charStream()}");
+//                        Log.d(TAG, "error res body: ${res?.errorBody()}");
+//                        Log.d(TAG, "error res body: ${res?.errorBody()?.charStream()}");
+//                        Log.d(TAG, "error res body: ${res?.errorBody()?.toString()}");
+                        Log.d(TAG, "error res body: ${res?.errorBody()?.string()}");
+//                        Log.d(TAG, "error res body: ${res?.body()}");
                         // NOTE: dialogを閉じるのでscan再開
                         isOpenDialog = false
                     })
